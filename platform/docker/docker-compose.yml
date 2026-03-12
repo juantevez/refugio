@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: shelter_db
+
+  # Esta imagen viene del repositorio de migraciones
+  db-migrator:
+    image: tu-registro/shelter-db-migrations:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: -url=jdbc:postgresql://postgres:5432/shelter_db -user=user -password=pass migrate
+
+  backend-api:
+    build: 
+      context: .
+      dockerfile: platform/docker/app.Dockerfile
+    depends_on:
+      db-migrator:
+        condition: service_completed_successfully # Solo arranca si Flyway terminó bien
