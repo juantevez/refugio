@@ -28,12 +28,12 @@ type Adopter struct {
 
 // Adopción (La relación)
 type Adoption struct {
-	ID            uuid.UUID
-	AnimalID      uuid.UUID // Referencia lógica al módulo de Animales
-	AdopterID     uuid.UUID
-	Status        AdoptionStatus
-	TrackingToken string // El "Magic Link" para el seguimiento
-	AdoptedAt     time.Time
+	ID            uuid.UUID      `db:"id"`
+	AnimalID      uuid.UUID      `db:"animal_id"`
+	AdopterID     uuid.UUID      `db:"adopter_id"`
+	Status        AdoptionStatus `db:"status"`
+	TrackingToken string         `db:"tracking_token"`
+	AdoptedAt     time.Time      `db:"adopted_at"`
 }
 
 // Seguimiento (Las actualizaciones post-adopción)

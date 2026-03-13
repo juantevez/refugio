@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
 	adoptionsDomain "github.com/juantevez/refugio-core/internal/adoptions/domain"
@@ -24,8 +25,9 @@ func (r *PostgresRepository) CreateAdoption(ctx context.Context, a *adoptionsDom
 
 func (r *PostgresRepository) GetAdoptionByToken(ctx context.Context, token string) (*adoptionsDomain.Adoption, error) {
 	var a adoptionsDomain.Adoption
-	query := `SELECT id, animal_id, adopter_id, status, tracking_token, adopted_at 
-              FROM adoptions_donations.adoptions WHERE tracking_token = $1`
+
+	query := `SELECT id, animal_id, status, tracking_token, adopted_at 
+          FROM adoptions_donations.adoptions WHERE tracking_token = $1`
 	err := r.db.GetContext(ctx, &a, query, token)
 	if err != nil {
 		return nil, err
@@ -34,8 +36,13 @@ func (r *PostgresRepository) GetAdoptionByToken(ctx context.Context, token strin
 }
 
 func (r *PostgresRepository) AddFollowUp(ctx context.Context, f *adoptionsDomain.FollowUp) error {
+	mediaJSON, err := json.Marshal(f.MediaURLs)
+	if err != nil {
+		return err
+	}
+
 	query := `INSERT INTO adoptions_donations.follow_ups (id, adoption_id, notes, media_urls, created_at) 
               VALUES ($1, $2, $3, $4, $5)`
-	_, err := r.db.ExecContext(ctx, query, f.ID, f.AdoptionID, f.Notes, f.MediaURLs, f.CreatedAt)
+	_, err = r.db.ExecContext(ctx, query, f.ID, f.AdoptionID, f.Notes, mediaJSON, f.CreatedAt)
 	return err
 }
