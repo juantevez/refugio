@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -40,6 +41,15 @@ func NewS3Repository() (*S3Repository, error) {
 func (r *S3Repository) UploadPhoto(ctx context.Context, animalID string, filename string, data []byte, contentType string) (string, string, error) {
 	key := fmt.Sprintf("animals/%s/%d_%s", animalID, time.Now().Unix(), filename)
 
+	// LOG: verificar qué parámetros está usando
+	log.Printf("S3 DEBUG — bucket: %s | region: %s | key: %s | contentType: %s | size: %d bytes",
+		r.bucket,
+		os.Getenv("AWS_REGION"),
+		key,
+		contentType,
+		len(data),
+	)
+
 	_, err := r.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucket),
 		Key:         aws.String(key),
@@ -47,6 +57,7 @@ func (r *S3Repository) UploadPhoto(ctx context.Context, animalID string, filenam
 		ContentType: aws.String(contentType),
 	})
 	if err != nil {
+		log.Printf("S3 DEBUG — PutObject error: %v", err)
 		return "", "", fmt.Errorf("error subiendo foto a S3: %w", err)
 	}
 

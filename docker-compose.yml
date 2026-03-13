@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shelter_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@shelter_db:5432/${POSTGRES_DB}?sslmode=disable
+    ports:
+      - "8080:8080"
+    networks:
+      - shelter_net
+
+networks:
+  shelter_net:
+    external: true
+    name: shelter-db-migrations_default
+    

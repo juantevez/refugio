@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -62,6 +63,12 @@ func main() {
 	// 5. Configurar Servidor HTTP
 	r := gin.Default()
 	r.SetTrustedProxies(nil) // Esto quita el warning y asegura que no confíe en proxies externos
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders: []string{"Content-Type"},
+	}))
 
 	// Rutas de la API v1
 	api := r.Group("/api/v1")
