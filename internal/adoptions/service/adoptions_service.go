@@ -7,30 +7,27 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/juantevez/refugio-core/internal/donations/domain"
+	adoptionsDomain "github.com/juantevez/refugio-core/internal/adoptions/domain"
 )
 
+// Antes usaba donationsDomain.DonationRepository, ahora:
 type AdoptionService struct {
-	repo domain.AdoptionRepository
+	repo adoptionsDomain.AdoptionRepository
 }
 
-func NewAdoptionService(r domain.AdoptionRepository) *AdoptionService {
-	return &AdoptionService{repo: r}
+func NewAdoptionService(repo adoptionsDomain.AdoptionRepository) *AdoptionService {
+	return &AdoptionService{repo: repo}
 }
 
-// StartAdoptionProcess inicia el vínculo y genera el token de seguimiento
-func (s *AdoptionService) StartAdoptionProcess(ctx context.Context, animalID uuid.UUID, adopterID uuid.UUID) (*domain.Adoption, error) {
+// StartAdoptionProcess inicia el trámite y genera el token de seguimiento
+func (s *AdoptionService) StartAdoptionProcess(ctx context.Context, animalID, adopterID uuid.UUID) (*adoptionsDomain.Adoption, error) {
+	token, _ := generateRandomToken(16)
 
-	// Generar un token seguro para el Magic Link
-	tokenBytes := make([]byte, 16)
-	rand.Read(tokenBytes)
-	token := hex.EncodeToString(tokenBytes)
-
-	adoption := &domain.Adoption{
+	adoption := &adoptionsDomain.Adoption{
 		ID:            uuid.New(),
 		AnimalID:      animalID,
 		AdopterID:     adopterID,
-		Status:        domain.AdoptionApproved,
+		Status:        adoptionsDomain.AdoptionPending,
 		TrackingToken: token,
 		AdoptedAt:     time.Now(),
 	}
@@ -42,20 +39,30 @@ func (s *AdoptionService) StartAdoptionProcess(ctx context.Context, animalID uui
 	return adoption, nil
 }
 
-// SubmitFollowUp permite al adoptante subir noticias sin login, solo con el token
-func (s *AdoptionService) SubmitFollowUp(ctx context.Context, token string, notes string, urls []string) error {
+// SubmitFollowUp permite al adoptante subir actualizaciones
+func (s *AdoptionService) SubmitFollowUp(ctx context.Context, token, notes string, media []string) error {
+	// 1. Buscar la adopción por token
 	adoption, err := s.repo.GetAdoptionByToken(ctx, token)
 	if err != nil {
-		return domain.ErrInvalidToken
+		return adoptionsDomain.ErrInvalidToken
 	}
 
-	followUp := &domain.FollowUp{
+	// 2. Crear el registro de seguimiento
+	followUp := &adoptionsDomain.FollowUp{
 		ID:         uuid.New(),
 		AdoptionID: adoption.ID,
 		Notes:      notes,
-		MediaURLs:  urls,
+		MediaURLs:  media,
 		CreatedAt:  time.Now(),
 	}
 
 	return s.repo.AddFollowUp(ctx, followUp)
+}
+
+func generateRandomToken(n int) (string, error) {
+	bytes := make([]byte, n)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

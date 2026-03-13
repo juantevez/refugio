@@ -8,20 +8,35 @@ import (
 	"github.com/juantevez/refugio-core/internal/donations/domain"
 )
 
-type DonationService struct {
-	repo domain.DonationRepository
+// DonationRepository define la interfaz que debe implementar el dRepo en el main
+type DonationRepository interface {
+	SaveDonation(ctx context.Context, d *domain.Donation) error
+	GetTotalDonations(ctx context.Context) (float64, error)
 }
 
-func NewDonationService(r domain.DonationRepository) *DonationService {
+type DonationService struct {
+	repo DonationRepository
+}
+
+func NewDonationService(r DonationRepository) *DonationService {
 	return &DonationService{repo: r}
 }
 
-// RegisterDonation procesa y guarda una nueva entrada de dinero
-func (s *DonationService) RegisterDonation(ctx context.Context, amount float64, currency string, source domain.DonationSource, ref string, animalID *uuid.UUID) (*domain.Donation, error) {
+// RegisterDonation orquesta la creación de la donación con los campos de Argentina
+func (s *DonationService) RegisterDonation(
+	ctx context.Context,
+	amount float64,
+	currency string,
+	source domain.DonationSource,
+	ref string,
+	animalID *uuid.UUID,
+	donorName string,
+	donorEmail string,
+	details *domain.TransferDetails,
+) (*domain.Donation, error) {
 
-	// Regla de negocio básica: no aceptamos montos negativos o cero
 	if amount <= 0 {
-		return nil, domain.ErrInvalidAmount // Deberías definir este error en domain
+		return nil, domain.ErrInvalidAmount
 	}
 
 	donation := &domain.Donation{
@@ -31,15 +46,15 @@ func (s *DonationService) RegisterDonation(ctx context.Context, amount float64, 
 		Source:          source,
 		ReferenceNumber: ref,
 		AnimalID:        animalID,
+		DonorName:       donorName,
+		DonorEmail:      donorEmail,
+		TransferDetails: details,
 		CreatedAt:       time.Now(),
 	}
 
 	if err := s.repo.SaveDonation(ctx, donation); err != nil {
 		return nil, err
 	}
-
-	// Aquí podrías disparar un evento: "DonationReceived"
-	// para que el módulo de notificaciones envíe un agradecimiento.
 
 	return donation, nil
 }

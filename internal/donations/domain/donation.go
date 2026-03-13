@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,17 +11,27 @@ type DonationSource string
 
 const (
 	SourceMercadoPago DonationSource = "MERCADO_PAGO"
-	SourcePayPal      DonationSource = "PAYPAL"
-	SourceTransfer    DonationSource = "BANK_TRANSFER"
+	SourceTransfer    DonationSource = "TRANSFERENCIA"
 )
+
+var ErrInvalidAmount = errors.New("el monto de la donación debe ser mayor a cero")
+
+type TransferDetails struct {
+	TaxID    string // CUIT/CUIL
+	Province string
+	Account  string // CBU/CVU
+	Alias    string
+}
 
 type Donation struct {
 	ID              uuid.UUID
 	Amount          float64
-	Currency        string // "ARS", "USD"
+	Currency        string
 	Source          DonationSource
-	ReferenceNumber string     // ID de transacción externa
-	DonorName       string     // Opcional (Anónimo)
-	AnimalID        *uuid.UUID // Opcional (Si es apadrinamiento)
+	ReferenceNumber string
+	AnimalID        *uuid.UUID
+	DonorName       string
+	DonorEmail      string
+	TransferDetails *TransferDetails // <-- Asegurate que este struct exista en domain
 	CreatedAt       time.Time
 }

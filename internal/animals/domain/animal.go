@@ -20,26 +20,22 @@ const (
 	SpeciesCat Species = "CAT"
 )
 
-// Animal representa la entidad principal del refugio
 type Animal struct {
-	ID             uuid.UUID
-	Name           string
-	Species        Species
-	Breed          string
-	Status         AnimalStatus
-	RescueDate     time.Time
-	MedicalHistory []MedicalRecord
-	CreatedAt      time.Time
+	ID         uuid.UUID    `json:"id" db:"id"`
+	Name       string       `json:"name" db:"name"`
+	Species    string       `db:"species"`
+	Breed      string       `json:"breed" db:"breed"`
+	Status     AnimalStatus `json:"status" db:"status"`
+	RescueDate time.Time    `json:"rescue_date" db:"rescue_date"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
 }
 
 // MedicalRecord representa una entrada en la historia clínica
 type MedicalRecord struct {
-	ID          uuid.UUID
-	AnimalID    uuid.UUID
-	Description string
-	Treatment   string
-	VetName     string
-	Date        time.Time
+	ID          uuid.UUID `db:"id"`
+	AnimalID    uuid.UUID `db:"animal_id"`
+	Description string    `db:"description"`
+	CreatedAt   time.Time `db:"created_at"` // <--- Agregar esta línea
 }
 
 // Errores de dominio

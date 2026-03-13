@@ -7,10 +7,8 @@ import (
 )
 
 type DonationRepository interface {
-	// ... (métodos de adopción previos)
-
-	// Donaciones
 	SaveDonation(ctx context.Context, donation *Donation) error
 	GetDonationsByAnimal(ctx context.Context, animalID uuid.UUID) ([]Donation, error)
 	GetTotalDonations(ctx context.Context) (float64, error)
+	// AddFollowUp NO debe estar aquí, debe estar en adoptions/domain/repository.go
 }
