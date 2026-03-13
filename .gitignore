@@ -8,6 +8,7 @@ dist/
 *.dll
 *.so
 *.dylib
+main
 
 # Si solés compilar el binario con un nombre específico (ej. shelter-api)
 refugio-core
