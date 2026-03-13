@@ -1,0 +1,359 @@
+{
+  "info": {
+    "name": "Refugio Core - Animal Photos",
+    "description": "Endpoints para subida y consulta de fotos de animales.\n\nEstrategia: S3 privado + pre-signed URLs generadas en cada GET.\nLímite: 4 fotos por animal.\nFormatos: JPEG, PNG — máx 5MB por foto.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "animal_id",
+      "value": "",
+      "type": "string",
+      "description": "UUID del animal. Completar manualmente o correr 'Obtener Animal ID' primero."
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup",
+      "item": [
+        {
+          "name": "Obtener Animal ID (para usar en fotos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (Array.isArray(body) && body.length > 0) {",
+                  "    pm.collectionVariables.set('animal_id', body[0].id);",
+                  "    console.log('✅ animal_id seteado:', body[0].id);",
+                  "} else {",
+                  "    console.warn('⚠️ No hay animales — creá uno primero con POST /animals');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/animals",
+              "host": ["{{base_url}}"],
+              "path": ["animals"]
+            },
+            "description": "Lista los animales y autocompleta {{animal_id}} con el primero de la lista.\nEjecutar antes de los requests de fotos."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📸 Animal Photos",
+      "item": [
+        {
+          "name": "Subir Foto (POST /animals/:id/photos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta tiene id y photo_order', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('string');",
+                  "    pm.expect(body.photo_order).to.be.a('number');",
+                  "    pm.expect(body.animal_id).to.eql(pm.collectionVariables.get('animal_id'));",
+                  "    console.log('✅ Foto subida, order:', body.photo_order);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Seleccionar archivo JPEG o PNG, máx 5MB"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/animals/{{animal_id}}/photos",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "{{animal_id}}", "photos"]
+            },
+            "description": "Sube una foto del animal a S3 y guarda el s3_key en la DB.\n\n**Cómo usar en Postman:**\n1. Body → form-data\n2. Key: 'photo', Type: File\n3. Seleccionar imagen JPEG o PNG\n\n**Validaciones:**\n- Content-Type: image/jpeg o image/png\n- Tamaño máximo: 5MB\n- Máximo 4 fotos por animal\n\n**Respuesta:** NO incluye URL (se genera en el GET, estrategia B)\n\n**S3 key generado:** animals/{animalID}/{timestamp}_{filename}"
+          },
+          "response": [
+            {
+              "name": "201 - Foto subida",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"id\": \"880e8400-e29b-41d4-a716-446655440003\",\n  \"animal_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"photo_order\": 0,\n  \"created_at\": \"2026-03-13T12:00:00Z\"\n}"
+            },
+            {
+              "name": "400 - Máximo de fotos alcanzado",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"el animal ya tiene 4 fotos\"\n}"
+            },
+            {
+              "name": "400 - Formato inválido",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"solo se aceptan imágenes JPEG o PNG\"\n}"
+            },
+            {
+              "name": "400 - Tamaño excedido",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"la foto no puede superar 5MB\"\n}"
+            },
+            {
+              "name": "404 - Animal no encontrado",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"error\": \"animal no encontrado\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Subir Foto 2 (photo_order: 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "console.log('✅ Foto 2 subida, order:', body.photo_order);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Segunda foto del animal"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/animals/{{animal_id}}/photos",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "{{animal_id}}", "photos"]
+            },
+            "description": "Segunda foto — debería tener photo_order: 1"
+          },
+          "response": []
+        },
+        {
+          "name": "Subir Foto 3 (photo_order: 2)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/animals/{{animal_id}}/photos",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "{{animal_id}}", "photos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Subir Foto 4 (photo_order: 3 — última)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/animals/{{animal_id}}/photos",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "{{animal_id}}", "photos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Subir Foto 5 (debe fallar — límite 4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 - límite de fotos alcanzado', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje de error correcto', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error).to.include('4 fotos');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Esta debe fallar con 400"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/animals/{{animal_id}}/photos",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "{{animal_id}}", "photos"]
+            },
+            "description": "Prueba el guard de negocio: ErrMaxPhotosReached.\nDebe devolver 400 después de haber subido 4 fotos."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Animal con URLs de Fotos (GET /animals/:id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta incluye photos con URLs pre-signed', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('string');",
+                  "    if (body.photos) {",
+                  "        pm.expect(body.photos).to.be.an('array');",
+                  "        body.photos.forEach((url, i) => {",
+                  "            pm.expect(url).to.include('amazonaws.com');",
+                  "            console.log('📸 Foto', i, ':', url.substring(0, 80) + '...');",
+                  "        });",
+                  "        console.log('✅ Total fotos:', body.photos.length);",
+                  "    } else {",
+                  "        console.warn('⚠️ Campo photos no presente en la respuesta todavía');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/animals/{{animal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "{{animal_id}}"]
+            },
+            "description": "Obtiene el animal con sus fotos.\n\n⚠️ Este endpoint necesita ser extendido para incluir el campo 'photos' en la respuesta.\nActualmente GetAnimal no llama a GetPhotos — hay que agregarlo al handler o al servicio.\n\nLa respuesta debería incluir:\n{\n  \"id\": \"...\",\n  \"name\": \"...\",\n  \"photos\": [\n    \"https://bucket.s3.amazonaws.com/animals/uuid/timestamp_foto.jpg?X-Amz-...\",\n    \"https://...\"\n  ]\n}"
+          },
+          "response": [
+            {
+              "name": "200 - Animal con fotos",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"Roco\",\n  \"species\": \"DOG\",\n  \"breed\": \"Callejero\",\n  \"status\": \"RESCUED\",\n  \"rescue_date\": \"2026-03-12T22:15:00Z\",\n  \"created_at\": \"2026-03-13T01:21:12Z\",\n  \"photos\": [\n    \"https://tu-bucket.s3.amazonaws.com/animals/uuid/1710288000_foto1.jpg?X-Amz-Algorithm=...\",\n    \"https://tu-bucket.s3.amazonaws.com/animals/uuid/1710288060_foto2.jpg?X-Amz-Algorithm=...\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Subir foto con animal_id inválido (debe fallar 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 - UUID inválido', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/animals/no-es-un-uuid/photos",
+              "host": ["{{base_url}}"],
+              "path": ["animals", "no-es-un-uuid", "photos"]
+            },
+            "description": "Prueba el guard de UUID inválido en el handler."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

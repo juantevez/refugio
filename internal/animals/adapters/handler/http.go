@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/juantevez/refugio-core/internal/animals/domain"
 	animalsDomain "github.com/juantevez/refugio-core/internal/animals/domain"
 	"github.com/juantevez/refugio-core/internal/animals/service"
 )
@@ -96,4 +98,60 @@ func (h *AnimalHandler) ListAnimals(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, animals)
+}
+
+func (h *AnimalHandler) UploadPhoto(c *gin.Context) {
+	animalID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de animal inválido"})
+		return
+	}
+
+	file, header, err := c.Request.FormFile("photo")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "foto requerida"})
+		return
+	}
+	defer file.Close()
+
+	// Validar content type
+	contentType := header.Header.Get("Content-Type")
+	if contentType != "image/jpeg" && contentType != "image/png" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "solo se aceptan imágenes JPEG o PNG"})
+		return
+	}
+
+	// Validar tamaño máximo 5MB
+	if header.Size > 5<<20 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "la foto no puede superar 5MB"})
+		return
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error leyendo la foto"})
+		return
+	}
+
+	photo, err := h.service.UploadPhoto(c.Request.Context(), animalID, header.Filename, data, contentType)
+	if err != nil {
+		if err == domain.ErrMaxPhotosReached {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "el animal ya tiene 4 fotos"})
+			return
+		}
+		if err == domain.ErrAnimalNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "animal no encontrado"})
+			return
+		}
+		log.Printf("ERROR REAL: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error subiendo la foto"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"id":          photo.ID,
+		"animal_id":   photo.AnimalID,
+		"photo_order": photo.PhotoOrder,
+		"created_at":  photo.CreatedAt,
+	})
 }

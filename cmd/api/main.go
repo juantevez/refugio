@@ -13,6 +13,8 @@ import (
 	animalRepo "github.com/juantevez/refugio-core/internal/animals/adapters/repository"
 	donRepo "github.com/juantevez/refugio-core/internal/donations/adapters/repository"
 
+	animalStorage "github.com/juantevez/refugio-core/internal/animals/adapters/storage"
+
 	// Capa de Servicios (Lógica de Negocio)
 	adoptService "github.com/juantevez/refugio-core/internal/adoptions/service"
 	animalService "github.com/juantevez/refugio-core/internal/animals/service"
@@ -37,13 +39,18 @@ func main() {
 	}
 	defer db.Close()
 
+	s3Repo, err := animalStorage.NewS3Repository()
+	if err != nil {
+		log.Fatalf("Error configurando S3: %v", err)
+	}
+
 	// 2. Instanciar Adaptadores de Persistencia
 	aRepo := animalRepo.NewPostgresRepository(db)
 	dRepo := donRepo.NewPostgresRepository(db)
 	adRepo := adoptRepo.NewPostgresRepository(db)
 
 	// 3. Instanciar Servicios
-	aSvc := animalService.NewAnimalService(aRepo)
+	aSvc := animalService.NewAnimalService(aRepo, s3Repo)
 	donSvc := donService.NewDonationService(dRepo)
 	adSvc := adoptService.NewAdoptionService(adRepo)
 
@@ -67,6 +74,7 @@ func main() {
 
 			animals.POST("", aHandler.RegisterRescue)
 			animals.GET("/:id", aHandler.GetAnimal)
+			animals.POST("/:id/photos", aHandler.UploadPhoto)
 		}
 
 		// Endpoints de Donaciones

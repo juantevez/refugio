@@ -15,4 +15,7 @@ type AnimalRepository interface {
 
 	// Para los registros médicos
 	AddMedicalRecord(ctx context.Context, record *MedicalRecord) error
+
+	SavePhoto(ctx context.Context, photo *AnimalPhoto) error
+	GetPhotosByAnimalID(ctx context.Context, animalID uuid.UUID) ([]AnimalPhoto, error)
 }

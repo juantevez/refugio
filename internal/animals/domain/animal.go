@@ -52,3 +52,14 @@ func (a *Animal) MarkAsAdopted() error {
 	a.Status = StatusAdopted
 	return nil
 }
+
+type AnimalPhoto struct {
+	ID         uuid.UUID `db:"id"`
+	AnimalID   uuid.UUID `db:"animal_id"`
+	S3URL      string    `db:"s3_url"`
+	S3Key      string    `db:"s3_key"`
+	PhotoOrder int16     `db:"photo_order"`
+	CreatedAt  time.Time `db:"created_at"`
+}
+
+var ErrMaxPhotosReached = errors.New("el animal ya tiene 4 fotos")

@@ -101,3 +101,20 @@ func (r *PostgresRepository) AddMedicalRecord(ctx context.Context, record *domai
 	)
 	return err
 }
+
+func (r *PostgresRepository) SavePhoto(ctx context.Context, photo *domain.AnimalPhoto) error {
+	query := `INSERT INTO animal_management.animal_photos (id, animal_id, s3_key, photo_order, created_at)
+	          VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.db.ExecContext(ctx, query, photo.ID, photo.AnimalID, photo.S3Key, photo.PhotoOrder, photo.CreatedAt)
+	return err
+}
+
+func (r *PostgresRepository) GetPhotosByAnimalID(ctx context.Context, animalID uuid.UUID) ([]domain.AnimalPhoto, error) {
+	var photos []domain.AnimalPhoto
+	query := `SELECT id, animal_id, s3_key, photo_order, created_at
+	          FROM animal_management.animal_photos
+	          WHERE animal_id = $1
+	          ORDER BY photo_order ASC`
+	err := r.db.SelectContext(ctx, &photos, query, animalID)
+	return photos, err
+}
