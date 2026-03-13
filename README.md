@@ -47,25 +47,25 @@ docker-compose up -d
 
 ### Correr la aplicación:
 
-   ```bash
+   ```
 go run cmd/main.go
-   ```bash
+   ```
 
 ### 🔌 API Endpoints
 
-   ``
-Animales
+
+### Animales
 POST /api/v1/animals - Registrar un nuevo rescate.
 
 GET /api/v1/animals - Listar todos los animales en el refugio.
 
 GET /api/v1/animals/:id - Obtener detalle de un animal.
-   ``
 
-Donaciones
+
+### Donaciones
 POST /api/v1/donations - Registrar una donación (soporta Transferencia y Mercado Pago).
 
-📊 ### Base de Datos
+### 📊 Base de Datos
 El esquema de la base de datos está versionado con Flyway.
 Principales esquemas:
 
@@ -73,11 +73,11 @@ animal_management: Tablas de animales y su historial de estados.
 
 adoptions_donations: Gestión de registros financieros y adopciones.
 
-🧪 ### Tests
+### 🧪 Tests
 Para ejecutar la suite de tests:
 
-   ```bash
+   ```
 go test ./...
-   ```bash
+   ```
 
 ### Desarrollado con ❤️ para ayudar a los animales.

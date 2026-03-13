@@ -3,6 +3,7 @@ package handler
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -47,7 +48,7 @@ func (h *AnimalHandler) RegisterRescue(c *gin.Context) {
 	animal, err := h.service.RegisterRescue(
 		c.Request.Context(),
 		req.Name,
-		req.Species,
+		strings.ToUpper(req.Species), // "Dog" → "DOG"
 		req.Breed,
 		req.RescueDate, // El nuevo parámetro que agregaste
 	)

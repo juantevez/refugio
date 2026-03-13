@@ -56,7 +56,7 @@ func (r *PostgresRepository) SaveDonation(ctx context.Context, d *domain.Donatio
 // GetTotalDonations adaptado a la nueva tabla
 func (r *PostgresRepository) GetTotalDonations(ctx context.Context) (float64, error) {
 	var total float64
-	query := `SELECT COALESCE(SUM(amount), 0) FROM animal_management.donations`
+	query := `SELECT COALESCE(SUM(amount), 0) FROM adoptions_donations.donations`
 
 	err := r.db.GetContext(ctx, &total, query)
 	return total, err

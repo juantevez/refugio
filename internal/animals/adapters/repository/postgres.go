@@ -27,7 +27,7 @@ func (r *PostgresRepository) Save(ctx context.Context, animal *domain.Animal) er
 	// pero lo ideal es que venga desde el Service/DTO.
 
 	query := `
-        INSERT INTO animal_management.animals (id, name, type, breed, status, rescue_date, created_at)
+        INSERT INTO animal_management.animals (id, name, species, breed, status, rescue_date, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	_, err := r.db.ExecContext(ctx, query,
