@@ -32,6 +32,6 @@ type Donation struct {
 	AnimalID        *uuid.UUID
 	DonorName       string
 	DonorEmail      string
-	TransferDetails *TransferDetails // <-- Asegurate que este struct exista en domain
+	TransferDetails *TransferDetails
 	CreatedAt       time.Time
 }

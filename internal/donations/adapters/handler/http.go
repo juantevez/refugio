@@ -81,9 +81,9 @@ func (h *DonationHandler) RegisterDonation(c *gin.Context) {
 		req.Source,
 		req.Reference,
 		req.AnimalID,
-		req.DonorName,   // <--- Nuevo
-		req.DonorEmail,  // <--- Nuevo
-		transferDetails, // <--- Nuevo (puede ser nil)
+		req.DonorName,   
+		req.DonorEmail,  
+		transferDetails, 
 	)
 
 	if err != nil {

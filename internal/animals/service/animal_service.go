@@ -26,7 +26,7 @@ func (s *AnimalService) RegisterRescue(ctx context.Context, name string, species
 		Species:    species,
 		Breed:      breed,
 		Status:     animalsDomain.StatusRescued,
-		RescueDate: rescueDate, // <--- AHORA SÍ SE ASIGNA EL DATO DEL REQUEST
+		RescueDate: rescueDate, 
 		CreatedAt:  time.Now(),
 	}
 

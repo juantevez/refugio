@@ -35,7 +35,7 @@ type MedicalRecord struct {
 	ID          uuid.UUID `db:"id"`
 	AnimalID    uuid.UUID `db:"animal_id"`
 	Description string    `db:"description"`
-	CreatedAt   time.Time `db:"created_at"` // <--- Agregar esta línea
+	CreatedAt   time.Time `db:"created_at"` 
 }
 
 // Errores de dominio

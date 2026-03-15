@@ -37,7 +37,7 @@ func (r *PostgresRepository) Save(ctx context.Context, animal *domain.Animal) er
 		animal.Breed,
 		animal.Status,
 		animal.RescueDate,
-		animal.CreatedAt, // <--- Usamos el valor del objeto actualizado
+		animal.CreatedAt, 
 	)
 	return err
 }

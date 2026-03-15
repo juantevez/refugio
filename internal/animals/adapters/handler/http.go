@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/juantevez/refugio-core/internal/animals/domain"
 	animalsDomain "github.com/juantevez/refugio-core/internal/animals/domain"
 	"github.com/juantevez/refugio-core/internal/animals/service"
 )
@@ -31,7 +30,7 @@ func NewAnimalHandler(s *service.AnimalService) *AnimalHandler {
 type registerRequest struct {
 	Name       string    `json:"name" binding:"required"`
 	Species    string    `json:"species" binding:"required"`
-	Breed      string    `json:"breed" binding:"required"` // <-- Faltaba esta línea
+	Breed      string    `json:"breed" binding:"required"`
 	Status     string    `json:"status" binding:"required"`
 	RescueDate time.Time `json:"rescue_date" binding:"required"`
 }
@@ -69,7 +68,7 @@ func (h *AnimalHandler) GetAnimal(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
-		log.Printf("ERROR REAL: %v", err) // Esto te va a decir la verdad en la terminal
+		log.Printf("ERROR REAL: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de animal inválido"})
 		return
 	}
@@ -80,24 +79,69 @@ func (h *AnimalHandler) GetAnimal(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "animal no encontrado"})
 			return
 		}
-		log.Printf("ERROR REAL: %v", err) // Esto te va a decir la verdad en la terminal
+		log.Printf("ERROR REAL: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, animal)
+	// Traer las pre-signed URLs de las fotos
+	photoURLs, err := h.service.GetPhotos(c.Request.Context(), id)
+	if err != nil {
+		log.Printf("ERROR REAL al obtener fotos: %v", err)
+		photoURLs = []string{} // no rompemos el endpoint si fallan las fotos
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":          animal.ID,
+		"name":        animal.Name,
+		"species":     animal.Species,
+		"breed":       animal.Breed,
+		"status":      animal.Status,
+		"rescue_date": animal.RescueDate,
+		"created_at":  animal.CreatedAt,
+		"photos":      photoURLs,
+	})
 }
 
 func (h *AnimalHandler) ListAnimals(c *gin.Context) {
-	// Por ahora mandamos nil en los filtros para que traiga todo
 	animals, err := h.service.List(c.Request.Context(), nil)
 	if err != nil {
-		log.Printf("ERROR REAL: %v", err) // Esto te va a decir la verdad en la terminal
+		log.Printf("ERROR REAL: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, animals)
+	// Construir respuesta con fotos
+	type animalResponse struct {
+		ID         interface{} `json:"id"`
+		Name       string      `json:"name"`
+		Species    string      `json:"species"`
+		Breed      string      `json:"breed"`
+		Status     interface{} `json:"status"`
+		RescueDate interface{} `json:"rescue_date"`
+		CreatedAt  interface{} `json:"created_at"`
+		Photos     []string    `json:"photos"`
+	}
+
+	result := make([]animalResponse, 0, len(animals))
+	for _, a := range animals {
+		photoURLs, err := h.service.GetPhotos(c.Request.Context(), a.ID)
+		if err != nil {
+			photoURLs = []string{}
+		}
+		result = append(result, animalResponse{
+			ID:         a.ID,
+			Name:       a.Name,
+			Species:    a.Species,
+			Breed:      a.Breed,
+			Status:     a.Status,
+			RescueDate: a.RescueDate,
+			CreatedAt:  a.CreatedAt,
+			Photos:     photoURLs,
+		})
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *AnimalHandler) UploadPhoto(c *gin.Context) {
@@ -135,11 +179,11 @@ func (h *AnimalHandler) UploadPhoto(c *gin.Context) {
 
 	photo, err := h.service.UploadPhoto(c.Request.Context(), animalID, header.Filename, data, contentType)
 	if err != nil {
-		if err == domain.ErrMaxPhotosReached {
+		if err == animalsDomain.ErrMaxPhotosReached {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "el animal ya tiene 4 fotos"})
 			return
 		}
-		if err == domain.ErrAnimalNotFound {
+		if err == animalsDomain.ErrAnimalNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "animal no encontrado"})
 			return
 		}
