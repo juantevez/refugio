@@ -1,0 +1,648 @@
+{
+  "info": {
+    "name": "Refugio Core - Lost Pets",
+    "description": "Endpoints para el módulo de mascotas perdidas/encontradas.\n\nFlujo típico:\n1. Alguien pierde una mascota → POST /reports (type: LOST)\n2. Alguien la encuentra → POST /reports (type: FOUND)\n3. El dueño busca reportes cercanos → GET /reports/search?lat=X&long=Y\n4. Se reúnen → PATCH /reports/:id/resolve\n\nUbicación: si la foto tiene GPS en EXIF, se usa esa (mayor confianza).\nSi no, se usan las coordenadas lat/long enviadas por el cliente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "report_id",
+      "value": "",
+      "type": "string",
+      "description": "UUID del reporte. Se autocompleta al correr 'Crear Reporte LOST'."
+    }
+  ],
+  "item": [
+    {
+      "name": "Crear Reportes",
+      "item": [
+        {
+          "name": "Crear Reporte LOST (con GPS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta tiene id y location_source', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.be.a('string');",
+                  "    pm.expect(body.type).to.eql('LOST');",
+                  "    pm.expect(body.location_source).to.be.oneOf(['GPS', 'EXIF', 'MANUAL']);",
+                  "    pm.collectionVariables.set('report_id', body.id);",
+                  "    console.log('report_id seteado:', body.id);",
+                  "    console.log('location_source:', body.location_source);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "LOST",
+                  "type": "text",
+                  "description": "LOST o FOUND"
+                },
+                {
+                  "key": "species",
+                  "value": "DOG",
+                  "type": "text",
+                  "description": "DOG, CAT u OTHER"
+                },
+                {
+                  "key": "description",
+                  "value": "Labrador marrón con collar rojo, responde al nombre Roco",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_name",
+                  "value": "Juan Pérez",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_email",
+                  "value": "juan@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_phone",
+                  "value": "+54 9 11 1234-5678",
+                  "type": "text"
+                },
+                {
+                  "key": "lat",
+                  "value": "-34.6037",
+                  "type": "text",
+                  "description": "Latitud (Buenos Aires)"
+                },
+                {
+                  "key": "long",
+                  "value": "-58.3816",
+                  "type": "text",
+                  "description": "Longitud (Buenos Aires)"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": [],
+                  "description": "Opcional. Si tiene GPS en EXIF, se usa esa ubicación en vez de lat/long."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports"]
+            },
+            "description": "Crea un reporte de mascota perdida.\n\n**Ubicación:** si la foto tiene datos GPS en EXIF, se ignoran lat/long y se usa la ubicación de la imagen (location_source: EXIF). Si no, se usa lat/long del form (location_source: GPS).\n\n**Campos requeridos:** type, contact_name, y al menos lat+long O una foto con EXIF.\n\n**S3 key generado:** lost_pets/{timestamp}_{filename}"
+          },
+          "response": [
+            {
+              "name": "201 - Reporte creado (GPS)",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440010\",\n  \"type\": \"LOST\",\n  \"species\": \"DOG\",\n  \"status\": \"ACTIVE\",\n  \"location_source\": \"GPS\",\n  \"contact_name\": \"Juan Pérez\",\n  \"reported_at\": \"2026-03-15T14:00:00Z\"\n}"
+            },
+            {
+              "name": "201 - Reporte creado (EXIF)",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440011\",\n  \"type\": \"LOST\",\n  \"species\": \"DOG\",\n  \"status\": \"ACTIVE\",\n  \"location_source\": \"EXIF\",\n  \"contact_name\": \"Juan Pérez\",\n  \"reported_at\": \"2026-03-15T14:00:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Crear Reporte FOUND (sin foto)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.type).to.eql('FOUND');",
+                  "console.log('Reporte FOUND creado:', body.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "FOUND",
+                  "type": "text"
+                },
+                {
+                  "key": "species",
+                  "value": "CAT",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Gato gris encontrado en Parque Rivadavia, sin collar",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_name",
+                  "value": "María García",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_phone",
+                  "value": "+54 9 11 8765-4321",
+                  "type": "text"
+                },
+                {
+                  "key": "lat",
+                  "value": "-34.6158",
+                  "type": "text"
+                },
+                {
+                  "key": "long",
+                  "value": "-58.4333",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports"]
+            },
+            "description": "Crea un reporte de mascota encontrada, sin foto."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Reporte — sin ubicación (debe fallar 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 - sin ubicación', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Mensaje de error correcto', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error).to.include('ubicación');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "LOST",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_name",
+                  "value": "Sin Ubicación",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports"]
+            },
+            "description": "Prueba el guard ErrInvalidLocation: no se envían lat/long ni foto con EXIF."
+          },
+          "response": [
+            {
+              "name": "400 - Sin ubicación",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"ubicación inválida: se requiere latitud y longitud\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Crear Reporte — tipo inválido (debe fallar 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 - tipo inválido', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "EXTRAVIADO",
+                  "type": "text",
+                  "description": "Valor inválido — debe ser LOST o FOUND"
+                },
+                {
+                  "key": "contact_name",
+                  "value": "Test",
+                  "type": "text"
+                },
+                {
+                  "key": "lat",
+                  "value": "-34.6037",
+                  "type": "text"
+                },
+                {
+                  "key": "long",
+                  "value": "-58.3816",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports"]
+            }
+          },
+          "response": [
+            {
+              "name": "400 - Tipo inválido",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"el tipo de reporte debe ser LOST o FOUND\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Buscar y Consultar",
+      "item": [
+        {
+          "name": "Buscar Reportes Cercanos (1km)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Respuesta es un array', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('array');",
+                  "    console.log('Reportes encontrados en radio 1km:', body.length);",
+                  "    if (body.length > 0) {",
+                  "        console.log('Primer reporte:', body[0].type, '-', body[0].species);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/search?lat=-34.6037&long=-58.3816&radius=1000",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "search"],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "-34.6037",
+                  "description": "Latitud del centro de búsqueda"
+                },
+                {
+                  "key": "long",
+                  "value": "-58.3816",
+                  "description": "Longitud del centro de búsqueda"
+                },
+                {
+                  "key": "radius",
+                  "value": "1000",
+                  "description": "Radio en metros (default: 1000)"
+                }
+              ]
+            },
+            "description": "Busca reportes ACTIVE dentro del radio especificado.\n\nUsa ST_DWithin de PostGIS sobre GEOGRAPHY — opera en metros directamente.\n\n**Parámetros:**\n- lat, long: centro de búsqueda (requeridos)\n- radius: radio en metros (opcional, default 1000)"
+          },
+          "response": [
+            {
+              "name": "200 - Reportes encontrados",
+              "status": "OK",
+              "code": 200,
+              "body": "[\n  {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440010\",\n    \"type\": \"LOST\",\n    \"species\": \"DOG\",\n    \"description\": \"Labrador marrón con collar rojo\",\n    \"photo_s3_key\": \"lost_pets/1718000000_roco.jpg\",\n    \"location\": { \"lat\": -34.6037, \"long\": -58.3816 },\n    \"location_source\": \"GPS\",\n    \"radius_meters\": 500,\n    \"status\": \"ACTIVE\",\n    \"contact_name\": \"Juan Pérez\",\n    \"contact_email\": \"juan@example.com\",\n    \"contact_phone\": \"+54 9 11 1234-5678\",\n    \"reported_at\": \"2026-03-15T14:00:00Z\",\n    \"created_at\": \"2026-03-15T14:00:00Z\"\n  }\n]"
+            },
+            {
+              "name": "200 - Sin resultados",
+              "status": "OK",
+              "code": 200,
+              "body": "[]"
+            }
+          ]
+        },
+        {
+          "name": "Buscar Reportes Cercanos (radio amplio 5km)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "console.log('Reportes en radio 5km:', body.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/search?lat=-34.6037&long=-58.3816&radius=5000",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "search"],
+              "query": [
+                { "key": "lat", "value": "-34.6037" },
+                { "key": "long", "value": "-58.3816" },
+                { "key": "radius", "value": "5000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar sin lat/long (debe fallar 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 - faltan coordenadas', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/search?radius=1000",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "search"],
+              "query": [
+                { "key": "radius", "value": "1000" }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "400 - Faltan coordenadas",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"lat y long son requeridos y deben ser números válidos\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Obtener Reporte por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Respuesta tiene campos esperados', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.id).to.eql(pm.collectionVariables.get('report_id'));",
+                  "    pm.expect(body.type).to.be.oneOf(['LOST', 'FOUND']);",
+                  "    pm.expect(body.status).to.be.oneOf(['ACTIVE', 'RESOLVED', 'EXPIRED']);",
+                  "    console.log('Reporte:', body.type, body.species, '- Status:', body.status);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/{{report_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "{{report_id}}"]
+            },
+            "description": "Obtiene un reporte por UUID. Usa {{report_id}} autocomplete del 'Crear Reporte LOST'."
+          },
+          "response": [
+            {
+              "name": "200 - Reporte encontrado",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440010\",\n  \"type\": \"LOST\",\n  \"species\": \"DOG\",\n  \"description\": \"Labrador marrón con collar rojo\",\n  \"photo_s3_key\": \"lost_pets/1718000000_roco.jpg\",\n  \"location\": { \"lat\": -34.6037, \"long\": -58.3816 },\n  \"location_source\": \"GPS\",\n  \"radius_meters\": 500,\n  \"status\": \"ACTIVE\",\n  \"contact_name\": \"Juan Pérez\",\n  \"contact_email\": \"juan@example.com\",\n  \"contact_phone\": \"+54 9 11 1234-5678\",\n  \"reported_at\": \"2026-03-15T14:00:00Z\",\n  \"created_at\": \"2026-03-15T14:00:00Z\"\n}"
+            },
+            {
+              "name": "404 - No encontrado",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"error\": \"reporte no encontrado\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Obtener Reporte con ID inválido (debe fallar 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 - UUID inválido', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/no-es-un-uuid",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "no-es-un-uuid"]
+            }
+          },
+          "response": [
+            {
+              "name": "400 - UUID inválido",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"ID de reporte inválido\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resolver Reporte",
+      "item": [
+        {
+          "name": "Resolver Reporte (ACTIVE → RESOLVED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Mensaje de confirmación', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('resuelto');",
+                  "    console.log('Reporte resuelto:', pm.collectionVariables.get('report_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/{{report_id}}/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "{{report_id}}", "resolve"]
+            },
+            "description": "Marca el reporte como RESOLVED.\n\nNo requiere body — la acción es implícita por el endpoint.\n\n**Casos de error:**\n- 404: el reporte no existe\n- 409: el reporte ya estaba resuelto"
+          },
+          "response": [
+            {
+              "name": "200 - Resuelto",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"message\": \"reporte marcado como resuelto\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resolver Reporte ya resuelto (debe fallar 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Mensaje de error correcto', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error).to.include('resuelto');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/{{report_id}}/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "{{report_id}}", "resolve"]
+            },
+            "description": "Intentar resolver dos veces el mismo reporte.\nCorrer DESPUÉS de 'Resolver Reporte (ACTIVE → RESOLVED)'."
+          },
+          "response": [
+            {
+              "name": "409 - Ya resuelto",
+              "status": "Conflict",
+              "code": 409,
+              "body": "{\n  \"error\": \"el reporte ya fue resuelto\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resolver Reporte inexistente (debe fallar 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/lost-pets/reports/00000000-0000-0000-0000-000000000000/resolve",
+              "host": ["{{base_url}}"],
+              "path": ["lost-pets", "reports", "00000000-0000-0000-0000-000000000000", "resolve"]
+            }
+          },
+          "response": [
+            {
+              "name": "404 - No encontrado",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"error\": \"reporte no encontrado\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

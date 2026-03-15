@@ -24,14 +24,14 @@ type TransferDetails struct {
 }
 
 type Donation struct {
-	ID              uuid.UUID
-	Amount          float64
-	Currency        string
-	Source          DonationSource
-	ReferenceNumber string
-	AnimalID        *uuid.UUID
-	DonorName       string
-	DonorEmail      string
-	TransferDetails *TransferDetails
-	CreatedAt       time.Time
+	ID              uuid.UUID        `json:"id"`
+	Amount          float64          `json:"amount"`
+	Currency        string           `json:"currency"`
+	Source          DonationSource   `json:"source"`
+	ReferenceNumber string           `json:"reference_number"`
+	AnimalID        *uuid.UUID       `json:"animal_id"`
+	DonorName       string           `json:"donor_name"`
+	DonorEmail      string           `json:"donor_email"`
+	TransferDetails *TransferDetails `json:"transfer_details,omitempty"`
+	CreatedAt       time.Time        `json:"created_at"`
 }

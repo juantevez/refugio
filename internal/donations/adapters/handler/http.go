@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
 	adoptionsService "github.com/juantevez/refugio-core/internal/adoptions/service"
 
 	donationDomain "github.com/juantevez/refugio-core/internal/donations/domain"
@@ -81,9 +82,9 @@ func (h *DonationHandler) RegisterDonation(c *gin.Context) {
 		req.Source,
 		req.Reference,
 		req.AnimalID,
-		req.DonorName,   
-		req.DonorEmail,  
-		transferDetails, 
+		req.DonorName,
+		req.DonorEmail,
+		transferDetails,
 	)
 
 	if err != nil {

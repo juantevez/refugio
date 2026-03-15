@@ -13,18 +13,23 @@ import (
 	adoptRepo "github.com/juantevez/refugio-core/internal/adoptions/adapters/repository"
 	animalRepo "github.com/juantevez/refugio-core/internal/animals/adapters/repository"
 	donRepo "github.com/juantevez/refugio-core/internal/donations/adapters/repository"
+	lostPetsRepo "github.com/juantevez/refugio-core/internal/lost_pets/adapters/repository"
 
 	animalStorage "github.com/juantevez/refugio-core/internal/animals/adapters/storage"
+	lostPetsExif "github.com/juantevez/refugio-core/internal/lost_pets/adapters/exif"
+	lostPetsStorage "github.com/juantevez/refugio-core/internal/lost_pets/adapters/storage"
 
 	// Capa de Servicios (Lógica de Negocio)
 	adoptService "github.com/juantevez/refugio-core/internal/adoptions/service"
 	animalService "github.com/juantevez/refugio-core/internal/animals/service"
 	donService "github.com/juantevez/refugio-core/internal/donations/service"
+	lostPetsService "github.com/juantevez/refugio-core/internal/lost_pets/service"
 
 	// Capa de Adaptadores (Handlers HTTP)
 	adoptionHandler "github.com/juantevez/refugio-core/internal/adoptions/adapters/handler"
 	animalHandler "github.com/juantevez/refugio-core/internal/animals/adapters/handler"
 	donationHandler "github.com/juantevez/refugio-core/internal/donations/adapters/handler"
+	lostPetsHandler "github.com/juantevez/refugio-core/internal/lost_pets/adapters/handler"
 )
 
 func main() {
@@ -45,20 +50,28 @@ func main() {
 		log.Fatalf("Error configurando S3: %v", err)
 	}
 
+	lpS3, err := lostPetsStorage.NewS3Adapter()
+	if err != nil {
+		log.Fatalf("Error configurando S3 para lost_pets: %v", err)
+	}
+
 	// 2. Instanciar Adaptadores de Persistencia
 	aRepo := animalRepo.NewPostgresRepository(db)
 	dRepo := donRepo.NewPostgresRepository(db)
 	adRepo := adoptRepo.NewPostgresRepository(db)
+	lpRepo := lostPetsRepo.NewPostgresRepository(db)
 
 	// 3. Instanciar Servicios
 	aSvc := animalService.NewAnimalService(aRepo, s3Repo)
 	donSvc := donService.NewDonationService(dRepo)
 	adSvc := adoptService.NewAdoptionService(adRepo)
+	lpSvc := lostPetsService.NewLostPetsService(lpRepo, lpS3, lostPetsExif.NewExtractor())
 
 	// 4. Instanciar Handlers
 	aHandler := animalHandler.NewAnimalHandler(aSvc)
 	dHandler := donationHandler.NewDonationHandler(donSvc, adSvc)
 	adHandler := adoptionHandler.NewAdoptionHandler(adSvc)
+	lpHandler := lostPetsHandler.NewLostPetsHandler(lpSvc)
 
 	// 5. Configurar Servidor HTTP
 	r := gin.Default()
@@ -92,6 +105,15 @@ func main() {
 		{
 			adoptions.POST("", adHandler.StartAdoption)
 			adoptions.POST("/follow-up/:token", adHandler.SubmitFollowUp)
+		}
+
+		// Endpoints de Mascotas Perdidas/Encontradas
+		lostPets := api.Group("/lost-pets")
+		{
+			lostPets.POST("/reports", lpHandler.CreateReport)
+			lostPets.GET("/reports/search", lpHandler.SearchNearby)
+			lostPets.GET("/reports/:id", lpHandler.GetReport)
+			lostPets.PATCH("/reports/:id/resolve", lpHandler.ResolveReport)
 		}
 	}
 
