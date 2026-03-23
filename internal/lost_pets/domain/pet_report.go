@@ -29,18 +29,25 @@ const (
 )
 
 type PetReport struct {
-	ID             uuid.UUID      `db:"id"`
-	Type           ReportType     `db:"type"`
-	Species        PetSpecies     `db:"species"`
-	Description    string         `db:"description"`
-	PhotoS3Key     string         `db:"photo_s3_key"`
-	Location       Point          `db:"location"`
-	LocationSource LocationSource `db:"location_source"`
-	RadiusMeters   int            `db:"radius_meters"`
-	Status         ReportStatus   `db:"status"`
-	ContactName    string         `db:"contact_name"`
-	ContactEmail   string         `db:"contact_email"`
-	ContactPhone   string         `db:"contact_phone"`
-	ReportedAt     time.Time      `db:"reported_at"`
-	CreatedAt      time.Time      `db:"created_at"`
+	ID             uuid.UUID      `db:"id"              json:"id"`
+	Type           ReportType     `db:"type"            json:"type"`
+	Species        PetSpecies     `db:"species"         json:"species"`
+	Description    string         `db:"description"     json:"description"`
+	PhotoS3Keys    []string       `db:"photo_s3_key"    json:"photo_s3_key"`
+	Location       Point          `db:"location"        json:"location"`
+	LocationSource LocationSource `db:"location_source" json:"location_source"`
+	RadiusMeters   int            `db:"radius_meters"   json:"radius_meters"`
+	Status         ReportStatus   `db:"status"          json:"status"`
+	ContactName    string         `db:"contact_name"    json:"contact_name"`
+	ContactEmail   string         `db:"contact_email"   json:"contact_email"`
+	ContactPhone   string         `db:"contact_phone"   json:"contact_phone"`
+	ReportedAt     time.Time      `db:"reported_at"     json:"reported_at"`
+	CreatedAt      time.Time      `db:"created_at"      json:"created_at"`
+}
+
+// Nuevo tipo en domain:
+type ImageInput struct {
+	Data        []byte
+	Filename    string
+	ContentType string
 }

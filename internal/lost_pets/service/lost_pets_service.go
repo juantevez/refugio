@@ -14,6 +14,12 @@ type LostPetsService struct {
 	exif    domain.ExifExtractor
 }
 
+type ImageInput struct {
+	Data        []byte
+	Filename    string
+	ContentType string
+}
+
 func NewLostPetsService(r domain.PetReportRepository, s domain.ImageStorage, e domain.ExifExtractor) *LostPetsService {
 	return &LostPetsService{repo: r, storage: s, exif: e}
 }
@@ -30,9 +36,7 @@ func (s *LostPetsService) CreateReport(
 	contactEmail string,
 	contactPhone string,
 	clientLocation *domain.Point,
-	imageData []byte,
-	imageFilename string,
-	imageContentType string,
+	images []domain.ImageInput,
 ) (*domain.PetReport, error) {
 
 	if reportType != domain.ReportTypeLost && reportType != domain.ReportTypeFound {
@@ -40,18 +44,22 @@ func (s *LostPetsService) CreateReport(
 	}
 
 	// Determinar ubicación y su fuente de confianza
-	location, locationSource, err := s.resolveLocation(imageData, clientLocation)
+	location, locationSource, err := s.resolveLocation(images, clientLocation)
 	if err != nil {
 		return nil, err
 	}
 
 	// Subir imagen a S3 (opcional: el reporte puede no tener foto)
-	var photoKey string
-	if len(imageData) > 0 {
-		photoKey, err = s.storage.Upload(ctx, "lost_pets", imageFilename, imageData, imageContentType)
+	var photoKeys []string
+	for _, img := range images {
+		if len(img.Data) == 0 {
+			continue
+		}
+		key, err := s.storage.Upload(ctx, "lost_pets", img.Filename, img.Data, img.ContentType)
 		if err != nil {
 			return nil, err
 		}
+		photoKeys = append(photoKeys, key)
 	}
 
 	report := &domain.PetReport{
@@ -59,7 +67,7 @@ func (s *LostPetsService) CreateReport(
 		Type:           reportType,
 		Species:        species,
 		Description:    description,
-		PhotoS3Key:     photoKey,
+		PhotoS3Keys:    photoKeys,
 		Location:       *location,
 		LocationSource: locationSource,
 		RadiusMeters:   500, // radio de búsqueda por defecto
@@ -91,6 +99,20 @@ func (s *LostPetsService) GetReport(ctx context.Context, id uuid.UUID) (*domain.
 	return s.repo.GetByID(ctx, id)
 }
 
+func (s *LostPetsService) GetPhotoURLs(ctx context.Context, s3Keys []string) []string {
+	urls := make([]string, 0, len(s3Keys))
+	for _, key := range s3Keys {
+		if key == "" {
+			continue
+		}
+		url, err := s.storage.GetPresignedURL(ctx, key)
+		if err == nil {
+			urls = append(urls, url)
+		}
+	}
+	return urls
+}
+
 // ResolveReport marca un reporte como resuelto (mascota encontrada/reunida con dueño).
 func (s *LostPetsService) ResolveReport(ctx context.Context, id uuid.UUID) error {
 	report, err := s.repo.GetByID(ctx, id)
@@ -104,12 +126,17 @@ func (s *LostPetsService) ResolveReport(ctx context.Context, id uuid.UUID) error
 }
 
 // resolveLocation decide qué ubicación usar y su nivel de confianza.
-// Jerarquía: EXIF (mayor confianza) > GPS del cliente > error si ninguna.
-func (s *LostPetsService) resolveLocation(imageData []byte, clientLocation *domain.Point) (*domain.Point, domain.LocationSource, error) {
-	// Intentar extraer GPS del EXIF de la imagen
-	if len(imageData) > 0 && s.exif != nil {
-		if exifPoint, err := s.exif.ExtractLocation(imageData); err == nil && exifPoint != nil {
-			return exifPoint, domain.LocationSourceEXIF, nil
+// Jerarquía: EXIF de cualquier imagen (mayor confianza) > GPS del cliente > error si ninguna.
+func (s *LostPetsService) resolveLocation(images []domain.ImageInput, clientLocation *domain.Point) (*domain.Point, domain.LocationSource, error) {
+	// Intentar extraer GPS del EXIF de cada imagen
+	if s.exif != nil {
+		for _, img := range images {
+			if len(img.Data) == 0 {
+				continue
+			}
+			if exifPoint, err := s.exif.ExtractLocation(img.Data); err == nil && exifPoint != nil {
+				return exifPoint, domain.LocationSourceEXIF, nil
+			}
 		}
 	}
 

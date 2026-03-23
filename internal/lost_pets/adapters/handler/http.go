@@ -22,6 +22,8 @@ func NewLostPetsHandler(s *service.LostPetsService) *LostPetsHandler {
 	return &LostPetsHandler{service: s}
 }
 
+//var images []domain.ImageInput
+
 // POST /api/v1/lost-pets/reports
 // Recibe multipart/form-data con campos de texto + foto opcional.
 func (h *LostPetsHandler) CreateReport(c *gin.Context) {
@@ -52,28 +54,42 @@ func (h *LostPetsHandler) CreateReport(c *gin.Context) {
 	}
 
 	// Foto opcional
-	var imageData []byte
-	var imageFilename, imageContentType string
-	file, header, err := c.Request.FormFile("photo")
-	if err == nil {
-		defer file.Close()
+	var images []domain.ImageInput
 
-		imageContentType = header.Header.Get("Content-Type")
-		if imageContentType != "image/jpeg" && imageContentType != "image/png" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "solo se aceptan imágenes JPEG o PNG"})
-			return
+	form, _ := c.MultipartForm()
+	if form != nil {
+		files := form.File["photos"] // campo "photos" desde el frontend
+		for _, header := range files {
+			if len(images) >= 4 {
+				break
+			}
+			ct := header.Header.Get("Content-Type")
+			if ct != "image/jpeg" && ct != "image/png" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "solo se aceptan imágenes JPEG o PNG"})
+				return
+			}
+			if header.Size > 5<<20 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "la foto no puede superar 5MB"})
+				return
+			}
+			f, err := header.Open()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "error leyendo foto"})
+				return
+			}
+			data, err := io.ReadAll(f)
+			f.Close()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "error leyendo foto"})
+				return
+			}
+			images = append(images, domain.ImageInput{
+				Data:        data,
+				Filename:    header.Filename,
+				ContentType: ct,
+			})
+			//images = append(images, imageInput{data: data, filename: header.Filename, contentType: ct})
 		}
-		if header.Size > 5<<20 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "la foto no puede superar 5MB"})
-			return
-		}
-
-		imageData, err = io.ReadAll(file)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error leyendo la foto"})
-			return
-		}
-		imageFilename = header.Filename
 	}
 
 	report, err := h.service.CreateReport(
@@ -85,9 +101,7 @@ func (h *LostPetsHandler) CreateReport(c *gin.Context) {
 		contactEmail,
 		contactPhone,
 		clientLocation,
-		imageData,
-		imageFilename,
-		imageContentType,
+		images,
 	)
 	if err != nil {
 		switch err {
@@ -142,7 +156,18 @@ func (h *LostPetsHandler) SearchNearby(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, reports)
+	type reportResponse struct {
+		domain.PetReport
+		PhotoURLs []string `json:"photo_urls"`
+	}
+	result := make([]reportResponse, 0, len(reports))
+	for _, r := range reports {
+		result = append(result, reportResponse{
+			PetReport: r,
+			PhotoURLs: h.service.GetPhotoURLs(c.Request.Context(), r.PhotoS3Keys),
+		})
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 // GET /api/v1/lost-pets/reports/:id
@@ -164,7 +189,22 @@ func (h *LostPetsHandler) GetReport(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, report)
+	c.JSON(http.StatusOK, gin.H{
+		"id":              report.ID,
+		"type":            report.Type,
+		"species":         report.Species,
+		"description":     report.Description,
+		"status":          report.Status,
+		"location":        report.Location,
+		"location_source": report.LocationSource,
+		"radius_meters":   report.RadiusMeters,
+		"contact_name":    report.ContactName,
+		"contact_email":   report.ContactEmail,
+		"contact_phone":   report.ContactPhone,
+		"reported_at":     report.ReportedAt,
+		"photo_s3_key":    report.PhotoS3Keys,
+		"photo_url":       h.service.GetPhotoURLs(c.Request.Context(), report.PhotoS3Keys),
+	})
 }
 
 // PATCH /api/v1/lost-pets/reports/:id/resolve

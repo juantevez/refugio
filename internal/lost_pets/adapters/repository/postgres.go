@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/juantevez/refugio-core/internal/lost_pets/domain"
+	"github.com/lib/pq"
 )
 
 type PostgresRepository struct {
@@ -21,21 +22,21 @@ func NewPostgresRepository(db *sqlx.DB) *PostgresRepository {
 // ST_X devuelve longitud, ST_Y devuelve latitud — no se puede mapear
 // GEOGRAPHY directamente con sqlx.
 type petReportRow struct {
-	ID             uuid.UUID      `db:"id"`
-	Type           string         `db:"type"`
-	Species        string         `db:"species"`
-	Description    string         `db:"description"`
-	PhotoS3Key     string         `db:"photo_s3_key"`
-	Lat            float64        `db:"lat"`
-	Long           float64        `db:"long"`
-	LocationSource string         `db:"location_source"`
-	RadiusMeters   int            `db:"radius_meters"`
-	Status         string         `db:"status"`
-	ContactName    string         `db:"contact_name"`
-	ContactEmail   string         `db:"contact_email"`
-	ContactPhone   string         `db:"contact_phone"`
-	ReportedAt     time.Time      `db:"reported_at"`
-	CreatedAt      time.Time      `db:"created_at"`
+	ID             uuid.UUID `db:"id"`
+	Type           string    `db:"type"`
+	Species        string    `db:"species"`
+	Description    string    `db:"description"`
+	PhotoS3Keys    []string  `db:"photo_s3_key"`
+	Lat            float64   `db:"lat"`
+	Long           float64   `db:"long"`
+	LocationSource string    `db:"location_source"`
+	RadiusMeters   int       `db:"radius_meters"`
+	Status         string    `db:"status"`
+	ContactName    string    `db:"contact_name"`
+	ContactEmail   string    `db:"contact_email"`
+	ContactPhone   string    `db:"contact_phone"`
+	ReportedAt     time.Time `db:"reported_at"`
+	CreatedAt      time.Time `db:"created_at"`
 }
 
 func (row *petReportRow) toDomain() *domain.PetReport {
@@ -44,7 +45,7 @@ func (row *petReportRow) toDomain() *domain.PetReport {
 		Type:           domain.ReportType(row.Type),
 		Species:        domain.PetSpecies(row.Species),
 		Description:    row.Description,
-		PhotoS3Key:     row.PhotoS3Key,
+		PhotoS3Keys:    row.PhotoS3Keys,
 		Location:       domain.Point{Lat: row.Lat, Long: row.Long},
 		LocationSource: domain.LocationSource(row.LocationSource),
 		RadiusMeters:   row.RadiusMeters,
@@ -86,9 +87,9 @@ func (r *PostgresRepository) Save(ctx context.Context, report *domain.PetReport)
 		report.Type,
 		report.Species,
 		report.Description,
-		report.PhotoS3Key,
-		report.Location.Long, // $6 — ST_MakePoint(X, Y) = (long, lat)
-		report.Location.Lat,  // $7
+		pq.Array(report.PhotoS3Keys), // $4 — wrappear con pq.Array
+		report.Location.Long,         // $6 — ST_MakePoint(X, Y) = (long, lat)
+		report.Location.Lat,          // $7
 		report.LocationSource,
 		report.RadiusMeters,
 		report.Status,
@@ -128,8 +129,8 @@ func (r *PostgresRepository) SearchNearby(ctx context.Context, area domain.Searc
 
 	var rows []petReportRow
 	if err := r.db.SelectContext(ctx, &rows, query,
-		area.Center.Long, // $1 — ST_MakePoint(X, Y) = (long, lat)
-		area.Center.Lat,  // $2
+		area.Center.Long,  // $1 — ST_MakePoint(X, Y) = (long, lat)
+		area.Center.Lat,   // $2
 		area.RadiusMeters, // $3 — metros
 	); err != nil {
 		return nil, err
